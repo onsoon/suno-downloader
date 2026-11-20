@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suno 가사·MP3 다운로더</title>
+<meta name="description" content="Suno 노래 링크를 넣으면 가사를 SRT·LRC 자막 파일로 만들고, 내 곡은 MP3까지 받는 도구">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f5fb; --card:#ffffff; --ink:#1b1830; --muted:#6b6785; --line:#e4e1f0;
+  --accent:#6d4cff; --accent-ink:#ffffff; --accent-soft:#efeaff; --ok:#13866f; --warn:#b4570b; --warn-soft:#fff4e8;
+  --hl:#fff3b0;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121019; --card:#1c1926; --ink:#ece9f7; --muted:#a29dbb; --line:#2f2b3d;
+    --accent:#9b84ff; --accent-ink:#120f1d; --accent-soft:#2a2440; --ok:#4fd1b0; --warn:#f0a35c; --warn-soft:#2e2216;
+    --hl:#4a4020;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121019; --card:#1c1926; --ink:#ece9f7; --muted:#a29dbb; --line:#2f2b3d;
+  --accent:#9b84ff; --accent-ink:#120f1d; --accent-soft:#2a2440; --ok:#4fd1b0; --warn:#f0a35c; --warn-soft:#2e2216;
+  --hl:#4a4020;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans KR",system-ui,sans-serif;line-height:1.6}
+main{max-width:860px;margin:0 auto;padding:32px 16px 80px}
+h1{font-size:1.7rem;margin:0 0 4px}
+h2{font-size:1.1rem;margin:0 0 12px}
+p{margin:0 0 10px}
+.sub{color:var(--muted);margin-bottom:22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:18px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input[type=text],input[type=number],textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+input[type=text]{flex:1;min-width:0}
+input[type=number]{width:96px}
+textarea{width:100%;min-height:180px;resize:vertical;font-size:.92rem}
+button,.btn{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+button.primary,.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.song{display:flex;gap:16px;align-items:center}
+.song img{width:96px;height:96px;border-radius:12px;object-fit:cover;background:var(--line);flex:none}
+.song .t{font-size:1.2rem;font-weight:700}
+.muted{color:var(--muted)}
+.small{font-size:.88rem}
+.note{background:var(--accent-soft);border-radius:12px;padding:12px 14px;font-size:.92rem;margin:12px 0}
+.note.warn{background:var(--warn-soft)}
+.err{color:var(--warn);font-weight:500;margin-top:10px}
+video{width:100%;max-height:220px;border-radius:12px;background:#000;margin:10px 0}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tabs button[aria-selected=true]{background:var(--accent-soft);border-color:var(--accent)}
+.lines{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:12px}
+.ln{display:grid;grid-template-columns:86px 1fr;gap:10px;padding:7px 12px;border-bottom:1px solid var(--line);cursor:pointer;font-size:.93rem}
+.ln:last-child{border-bottom:0}
+.ln .tm{font-variant-numeric:tabular-nums;color:var(--muted)}
+.ln.cur{background:var(--hl)}
+.ln.next{outline:2px solid var(--accent);outline-offset:-2px}
+.ln.done .tm{color:var(--ok);font-weight:500}
+.big{font-size:1.05rem;padding:12px 18px}
+.dl{display:flex;gap:10px;flex-wrap:wrap}
+.hidden{display:none !important}
+code{background:var(--accent-soft);padding:1px 6px;border-radius:6px;font-size:.88em}
+ol{padding-left:20px;margin:6px 0}
+.bm{border:2px dashed var(--accent);background:var(--accent-soft);color:var(--ink);padding:10px 16px;border-radius:12px;font-weight:700;text-decoration:none;display:inline-block}
+kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:0 6px;font-size:.85em;background:var(--card)}
+footer{color:var(--muted);font-size:.82rem;margin-top:28px}
+@media (max-width:560px){ .song img{width:72px;height:72px} .ln{grid-template-columns:72px 1fr} }
+</style>
+</head>
+<body>
+<main>
+  <h1>Suno 가사·MP3 다운로더</h1>
+  <p class="sub">Suno 노래 링크를 넣으면 가사를 SRT·LRC 자막 파일로 만들어 드려요. 본인이 만든 곡에만 써 주세요.</p>
+
+  <section class="card">
+    <h2>1. 노래 링크 넣기</h2>
+    <form id="f" class="row">
+      <input type="text" id="url" placeholder="https://suno.com/song/… 또는 https://suno.com/s/…" autocomplete="off">
+      <button class="primary" id="go">불러오기</button>
+    </form>
+    <div id="err" class="err hidden"></div>
+  </section>
+
+  <section class="card hidden" id="songCard">
+    <div class="song">
+      <img id="cover" alt="" onerror="this.style.visibility='hidden'">
+      <div>
+        <div class="t" id="title"></div>
+        <div class="muted small" id="meta"></div>
+      </div>
+    </div>
+    <video id="player" controls playsinline preload="metadata"></video>
+    <div id="mp3Box"></div>
+  </section>
+
+  <section class="card hidden" id="lyricCard">
+    <h2>2. 가사 타이밍 맞추기</h2>
+    <div class="tabs" role="tablist">
+      <button type="button" data-tab="auto" aria-selected="true">자동 추정</button>
+      <button type="button" data-tab="tap" aria-selected="false">탭으로 맞추기 (정확)</button>
+      <button type="button" data-tab="edit" aria-selected="false">가사 고치기</button>
+    </div>
+
+    <div data-pane="auto">
+      <p class="small muted">곡 길이와 가사 줄 길이로 시간을 나눠 배치해요. 대략적인 위치라서, 첫 가사가 시작하는 시각과 마지막 가사가 끝나는 시각을 맞춰 주면 훨씬 비슷해져요. 영상에서 해당 위치를 재생한 뒤 "지금 위치" 버튼을 누르면 편해요.</p>
+      <div class="row small" style="margin-bottom:12px">
+        <label>첫 가사 시작 <input type="number" id="tStart" step="0.1" min="0"> 초</label>
+        <button type="button" data-now="tStart">지금 위치</button>
+        <label>마지막 가사 끝 <input type="number" id="tEnd" step="0.1" min="0"> 초</label>
+        <button type="button" data-now="tEnd">지금 위치</button>
+      </div>
+    </div>
+
+    <div data-pane="tap" class="hidden">
+      <div class="note">영상을 재생하면서, 각 줄을 <b>부르기 시작하는 순간</b>에 <kbd>Space</kbd> 키(또는 아래 큰 버튼)를 누르세요. 테두리가 쳐진 줄이 다음에 찍힐 줄이에요. 잘못 눌렀으면 <kbd>Backspace</kbd>로 한 줄 되돌려요. 다 찍으면 실제 노래와 거의 같은 타이밍이 돼요.</div>
+      <div class="row" style="margin-bottom:12px">
+        <button type="button" class="primary big" id="tapBtn">▶ 시작 / 이 줄 시작!</button>
+        <button type="button" id="undoBtn">한 줄 되돌리기</button>
+        <button type="button" id="resetTap">처음부터 다시</button>
+        <span class="small muted" id="tapInfo"></span>
+      </div>
+    </div>
+
+    <div data-pane="edit" class="hidden">
+      <p class="small muted">한 줄이 자막 한 줄이 돼요. <code>[Verse]</code> 같은 대괄호 줄은 구간 표시로만 쓰이고 자막에는 안 들어가요. 고치면 타이밍은 자동 추정으로 다시 계산돼요.</p>
+      <textarea id="lyrics"></textarea>
+    </div>
+
+    <div class="lines" id="lines"></div>
+    <p class="small muted" style="margin-top:8px">줄을 누르면 그 위치로 이동해요. 지금 타이밍 기준: <b id="basis">자동 추정</b></p>
+  </section>
+
+  <section class="card hidden" id="dlCard">
+    <h2>3. 다운로드</h2>
+    <div class="dl">
+      <button class="primary" id="dlSrt">SRT 자막 받기</button>
+      <button class="primary" id="dlLrc">LRC 가사 받기</button>
+      <button id="dlTxt">가사 TXT</button>
+    </div>
+  </section>
+
+  <section class="card" id="mineCard">
+    <h2>내 곡 모드: MP3 + Suno 원본 타이밍</h2>
+    <p>Suno는 MP3 파일과 단어별 가사 타이밍을 <b>곡 주인이 로그인했을 때만</b> 내줘요. 그래서 이 부분은 Suno 사이트 안에서 돌아가는 북마크 버튼으로 처리해요. 로그인 정보는 이 사이트로 넘어오지 않고, 내 브라우저의 suno.com 안에서만 쓰여요.</p>
+    <ol class="small">
+      <li>아래 보라색 버튼을 브라우저 <b>북마크바로 끌어다 놓으세요</b>. (북마크바가 안 보이면 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>)</li>
+      <li>suno.com에 로그인한 뒤 <b>내 노래 페이지</b>(<code>suno.com/song/…</code>)를 여세요.</li>
+      <li>북마크바의 버튼을 누르면 화면 오른쪽 위에 MP3·SRT·LRC 다운로드 창이 떠요.</li>
+    </ol>
+    <p style="margin-top:12px"><a class="bm" id="bmLink" href="#">🎵 Suno 내 곡 받기</a></p>
+    <p class="small muted">Suno 원본 타이밍이 안 나오는 곡(오래된 곡 등)은 자동 추정 타이밍으로 만들어져요.</p>
+  </section>
+
+  <footer>Suno 이용약관상 다운로드한 곡의 권리는 요금제와 곡 주인 기준을 따라요. 다른 사람의 곡을 받아 재배포하지 마세요. 이 도구는 Suno와 관련이 없는 개인 도구예요.</footer>
+</main>
+
+<!-- 공통 로직: 웹앱과 북마크 버튼이 같이 씀 -->
+<script id="core">
+var SunoCore = (function(){
+  function pad(n,w){ n=String(n); while(n.length<w) n='0'+n; return n; }
+  function srtTime(s){ s=Math.max(0,s); var ms=Math.round(s*1000); var h=Math.floor(ms/3600000); ms-=h*3600000; var m=Math.floor(ms/60000); ms-=m*60000; var sec=Math.floor(ms/1000); ms-=sec*1000; return pad(h,2)+':'+pad(m,2)+':'+pad(sec,2)+','+pad(ms,3); }
+  function lrcTime(s){ s=Math.max(0,s); var cs=Math.round(s*100); var m=Math.floor(cs/6000); cs-=m*6000; var sec=Math.floor(cs/100); cs-=sec*100; return pad(m,2)+':'+pad(sec,2)+'.'+pad(cs,2); }
+  function cleanLine(t){ return String(t).replace(/\[[^\]]*\]/g,'').replace(/\s+/g,' ').trim(); }
+  function isTag(t){ return /^\s*\[[^\]]*\]\s*$/.test(t); }
+  function weight(t){ var ko=(t.match(/[가-힣぀-ヿ一-鿿]/g)||[]).length; var la=(t.match(/[A-Za-z0-9]/g)||[]).length; return 1.2+ko+la/2.8; }
+  // 가사 텍스트 → 줄 목록 (구간 표시는 빼고, 앞에 쉼 정보만 남김)
+  function parseLyrics(raw){
+    var out=[], gap=0;
+    String(raw||'').split(/\r?\n/).forEach(function(r){
+      var t=r.trim();
+      if(!t){ gap+=0.5; return; }
+      if(isTag(t)){ gap+=1.5; return; }
+      var c=cleanLine(t); if(!c) return;
+      out.push({text:c, gap: out.length?gap:0}); gap=0;
+    });
+    return out;
+  }
+  // 자동 추정: start~end 사이를 줄 길이 비율로 나눔
+  function estimate(lines, start, end){
+    if(!lines.length) return [];
+    var ws=lines.map(function(l){return weight(l.text);});
+    var avg=ws.reduce(function(a,b){return a+b;},0)/ws.length;
+    var gapUnit=avg*0.6, total=0;
+    lines.forEach(function(l,i){ total+=ws[i]+(l.gap||0)*gapUnit; });
+    var scale=Math.max(0.1,(end-start))/total, t=start;
+    return lines.map(function(l,i){
+      t+=(l.gap||0)*gapUnit*scale;
+      var dur=ws[i]*scale, s=t; t+=dur;
+      return {text:l.text, start:s, end:s+dur*0.92};
+    });
+  }
+  // Suno aligned_lyrics 응답 → 줄 단위 타이밍
+  function fromAligned(data){
+    if(!data) return [];
+    if(Array.isArray(data.aligned_lyrics) && data.aligned_lyrics.length && data.aligned_lyrics[0].text!=null){
+      return data.aligned_lyrics.map(function(l){ return {text:cleanLine(l.text), start:+(l.start_s!=null?l.start_s:l.start), end:+(l.end_s!=null?l.end_s:l.end)}; }).filter(function(l){return l.text && isFinite(l.start);});
+    }
+    var words=data.aligned_words||data.words||[];
+    var lines=[], cur=null;
+    words.forEach(function(w){
+      var s=+(w.start_s!=null?w.start_s:w.start), e=+(w.end_s!=null?w.end_s:w.end);
+      String(w.word||w.text||'').split('\n').forEach(function(p,i){
+        if(i>0 && cur){ lines.push(cur); cur=null; }
+        if(!cleanLine(p)) return;
+        if(!cur) cur={text:'',start:s,end:e};
+        cur.text+=p; cur.end=e;
+      });
+    });
+    if(cur) lines.push(cur);
+    return lines.map(function(l){ return {text:cleanLine(l.text), start:l.start, end:l.end}; }).filter(function(l){ return l.text && isFinite(l.start); });
+  }
+  function fixEnds(lines, duration){
+    return lines.map(function(l,i){
+      var nx=lines[i+1], end=l.end;
+      if(!(end>l.start)) end=l.start+3;
+      if(nx && end>nx.start-0.02) end=Math.max(l.start+0.3,nx.start-0.02);
+      if(duration && end>duration) end=duration;
+      return {text:l.text,start:l.start,end:end};
+    });
+  }
+  function toSRT(lines){ return lines.map(function(l,i){ return (i+1)+'\n'+srtTime(l.start)+' --> '+srtTime(l.end)+'\n'+l.text+'\n'; }).join('\n'); }
+  function toLRC(lines, info){
+    info=info||{}; var h=[];
+    if(info.title) h.push('[ti:'+info.title+']');
+    if(info.artist) h.push('[ar:'+info.artist+']');
+    if(info.duration) h.push('[length:'+lrcTime(info.duration).slice(0,5)+']');
+    h.push('[re:Suno 가사 다운로더]');
+    return h.concat(lines.map(function(l){ return '['+lrcTime(l.start)+']'+l.text; })).join('\n')+'\n';
+  }
+  function safeName(t){ return (String(t||'suno').replace(/[\\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim()||'suno').slice(0,80); }
+  function save(text, name, type){
+    var blob=new Blob(['﻿'+text],{type:(type||'text/plain')+';charset=utf-8'});
+    saveBlob(blob,name);
+  }
+  function saveBlob(blob,name){
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },2000);
+  }
+  return {parseLyrics:parseLyrics, estimate:estimate, fromAligned:fromAligned, fixEnds:fixEnds, toSRT:toSRT, toLRC:toLRC, safeName:safeName, save:save, saveBlob:saveBlob, lrcTime:lrcTime, cleanLine:cleanLine};
+})();
+</script>
+
+<!-- 북마크 버튼 본체 (suno.com 안에서 실행) -->
+<script id="bm" type="text/plain">
+(async function(){
+  var C=SunoCore, API='https://studio-api.prod.suno.com';
+  var old=document.getElementById('__sunoDL'); if(old) old.remove();
+  var box=document.createElement('div'); box.id='__sunoDL';
+  box.style.cssText='position:fixed;top:16px;right:16px;z-index:2147483647;width:320px;max-width:calc(100vw - 32px);background:#1c1926;color:#ece9f7;border:1px solid #3a3550;border-radius:14px;padding:16px;font:14px/1.5 system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4)';
+  function say(html){ box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>🎵 Suno 내 곡 받기</b><button id="__sx" style="background:none;border:0;color:#aaa;font-size:18px;cursor:pointer">×</button></div>'+html; box.querySelector('#__sx').onclick=function(){box.remove();}; }
+  document.body.appendChild(box);
+  var m=location.href.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  if(!m){ say('노래 페이지(<b>suno.com/song/…</b>)에서 눌러 주세요.'); return; }
+  var id=m[0]; say('불러오는 중…');
+  var token=null;
+  try{ if(window.Clerk && window.Clerk.session) token=await window.Clerk.session.getToken(); }catch(e){}
+  if(!token){ var ck=document.cookie.match(/(?:^|; )__session=([^;]+)/); if(ck) token=decodeURIComponent(ck[1]); }
+  var H=token?{Authorization:'Bearer '+token}:{};
+  var clip;
+  try{ var r=await fetch(API+'/api/clip/'+id,{headers:H}); if(!r.ok) throw new Error('HTTP '+r.status); clip=await r.json(); }
+  catch(e){ say('곡 정보를 못 가져왔어요 ('+e.message+'). 로그인했는지 확인해 주세요.'); return; }
+  var md=clip.metadata||{}, dur=md.duration||0, title=clip.title||'suno', artist=clip.display_name||'';
+  var lines=[], basis='';
+  try{ var r2=await fetch(API+'/api/gen/'+id+'/aligned_lyrics/v2/',{headers:H}); if(r2.ok){ lines=C.fromAligned(await r2.json()); if(lines.length) basis='Suno 원본 타이밍'; } }catch(e){}
+  if(!lines.length){ var pl=C.parseLyrics(md.prompt); if(pl.length){ lines=C.estimate(pl, dur*0.05, dur*0.92); basis='자동 추정 타이밍 (Suno 원본 타이밍 없음)'; } }
+  lines=C.fixEnds(lines,dur);
+  var mp3=clip.audio_url && !/forbidden/.test(clip.audio_url) ? clip.audio_url : null;
+  var name=C.safeName(title);
+  var b='display:block;width:100%;margin:6px 0;padding:9px;border-radius:10px;border:0;font-weight:600;cursor:pointer;';
+  say('<div style="margin-bottom:6px">'+title.replace(/</g,'&lt;')+'</div>'
+    +(mp3?'<button id="__m" style="'+b+'background:#9b84ff;color:#120f1d">MP3 받기</button>':'<div style="color:#f0a35c;margin:6px 0">MP3 권한이 없어요. 내 곡인지, 로그인했는지 확인해 주세요.</div>')
+    +(lines.length?'<button id="__s" style="'+b+'background:#2f2b3d;color:#fff">SRT 받기</button><button id="__l" style="'+b+'background:#2f2b3d;color:#fff">LRC 받기</button><div style="color:#a29dbb;font-size:12px">'+lines.length+'줄 · '+basis+'</div>':'<div style="color:#a29dbb">가사가 없는 곡이에요.</div>'));
+  if(mp3) box.querySelector('#__m').onclick=async function(){
+    var btn=this; btn.textContent='받는 중…';
+    try{ var a=await fetch(mp3); if(!a.ok) throw 0; C.saveBlob(await a.blob(), name+'.mp3'); btn.textContent='MP3 받기 ✓'; }
+    catch(e){ window.open(mp3,'_blank'); btn.textContent='새 탭에서 열었어요 (우클릭 → 저장)'; }
+  };
+  if(lines.length){
+    box.querySelector('#__s').onclick=function(){ C.save(C.toSRT(lines), name+'.srt'); };
+    box.querySelector('#__l').onclick=function(){ C.save(C.toLRC(lines,{title:title,artist:artist,duration:dur}), name+'.lrc'); };
+  }
+})();
+</script>
+
+<script>
+(function(){
+  var C=SunoCore, $=function(id){return document.getElementById(id);};
+  var song=null, lines=[], timed=[], basis='자동 추정', tapIdx=0, tapMode=false;
+  var player=$('player');
+
+  // 북마크 버튼 링크 만들기
+  $('bmLink').href='javascript:'+encodeURIComponent($('core').textContent+';'+$('bm').textContent);
+  $('bmLink').addEventListener('click',function(e){ e.preventDefault(); alertBox('이 버튼은 누르지 말고 북마크바로 끌어다 놓은 뒤, suno.com 노래 페이지에서 눌러 주세요.'); });
+  function alertBox(msg){ var n=$('err'); n.textContent=msg; n.classList.remove('hidden'); n.scrollIntoView({behavior:'smooth',block:'center'}); }
+
+  function fmt(s){ return C.lrcTime(s); }
+
+  $('f').addEventListener('submit', async function(e){
+    e.preventDefault();
+    var url=$('url').value.trim(); $('err').classList.add('hidden');
+    if(!url){ alertBox('Suno 노래 링크를 넣어 주세요.'); return; }
+    $('go').disabled=true; $('go').textContent='불러오는 중…';
+    try{ song=await load(url); show(); }
+    catch(err){ alertBox(err.message||String(err)); }
+    finally{ $('go').disabled=false; $('go').textContent='불러오기'; }
+  });
+
+  async function load(url){
+    var r=await fetch('/api/clip?url='+encodeURIComponent(url));
+    var ct=r.headers.get('content-type')||'';
+    if(ct.indexOf('json')<0) throw new Error('서버(/api/clip)에 연결하지 못했어요. Vercel에 배포한 주소에서 열어 주세요.');
+    var j=await r.json(); if(!r.ok) throw new Error(j.error||('오류 '+r.status));
+    return j;
+  }
+
+  function show(){
+    $('songCard').classList.remove('hidden');
+    $('cover').style.visibility='visible'; $('cover').src=song.image||''; $('title').textContent=song.title;
+    $('meta').textContent=[song.artist, song.duration?fmt(song.duration).slice(0,5):'', song.tags].filter(Boolean).join(' · ');
+    player.src=song.video_url||''; player.classList.toggle('hidden',!song.video_url);
+    $('mp3Box').innerHTML='';
+    var note=document.createElement('div'); note.className='note small';
+    if(song.audio_url){
+      note.innerHTML='MP3: <a class="btn primary" target="_blank" rel="noopener">MP3 열기</a> (열린 탭에서 우클릭 → 다른 이름으로 저장)';
+      note.querySelector('a').href=song.audio_url;
+    } else {
+      note.className='note warn small';
+      note.innerHTML='Suno가 로그인하지 않은 사람에게는 MP3를 주지 않아요. MP3는 아래 <b>내 곡 모드</b> 버튼으로 받아 주세요. 가사 파일은 여기서 바로 만들 수 있어요.';
+    }
+    $('mp3Box').appendChild(note);
+    $('lyrics').value=song.lyrics||'';
+    var hasLyrics=C.parseLyrics(song.lyrics).length>0;
+    $('lyricCard').classList.toggle('hidden',!hasLyrics);
+    $('dlCard').classList.toggle('hidden',!hasLyrics);
+    if(!hasLyrics){ var n2=document.createElement('div'); n2.className='note small'; n2.textContent=song.instrumental?'연주곡이라 가사가 없어요.':'이 곡에는 가사 정보가 없어요.'; $('mp3Box').appendChild(n2); return; }
+    var d=song.duration||180;
+    $('tStart').value=(d*0.05).toFixed(1); $('tEnd').value=(d*0.92).toFixed(1);
+    rebuild();
+    setTab('auto');
+  }
+
+  function rebuild(){
+    lines=C.parseLyrics($('lyrics').value);
+    var s=parseFloat($('tStart').value)||0, e=parseFloat($('tEnd').value)||(song.duration||180);
+    timed=C.fixEnds(C.estimate(lines,s,Math.max(s+1,e)), song.duration);
+    basis='자동 추정'; tapIdx=0; render();
+  }
+
+  function render(){
+    var box=$('lines'); box.innerHTML='';
+    timed.forEach(function(l,i){
+      var d=document.createElement('div'); d.className='ln'; d.dataset.i=i;
+      if(tapMode && i<tapIdx) d.classList.add('done');
+      if(tapMode && i===tapIdx) d.classList.add('next');
+      d.innerHTML='<span class="tm"></span><span class="tx"></span>';
+      d.querySelector('.tm').textContent=fmt(l.start);
+      d.querySelector('.tx').textContent=l.text;
+      d.onclick=function(){ if(player.src){ player.currentTime=Math.max(0,l.start-0.3); player.play(); } };
+      box.appendChild(d);
+    });
+    $('basis').textContent=basis;
+    $('tapInfo').textContent=tapMode?(tapIdx+' / '+timed.length+'줄'):'';
+  }
+
+  // 재생 위치에 맞춰 현재 줄 표시
+  player.addEventListener('timeupdate',function(){
+    var t=player.currentTime, cur=-1;
+    timed.forEach(function(l,i){ if(t>=l.start && t<l.end+0.4) cur=i; });
+    document.querySelectorAll('.ln').forEach(function(el){ el.classList.toggle('cur', +el.dataset.i===cur); });
+  });
+
+  function setTab(name){
+    document.querySelectorAll('.tabs button').forEach(function(b){ b.setAttribute('aria-selected', b.dataset.tab===name); });
+    document.querySelectorAll('[data-pane]').forEach(function(p){ p.classList.toggle('hidden', p.dataset.pane!==name); });
+    tapMode=(name==='tap'); render();
+  }
+  document.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){ setTab(b.dataset.tab); }; });
+  $('tStart').addEventListener('change',rebuild); $('tEnd').addEventListener('change',rebuild);
+  $('lyrics').addEventListener('input',function(){ clearTimeout(this._t); this._t=setTimeout(rebuild,400); });
+  document.querySelectorAll('[data-now]').forEach(function(b){ b.onclick=function(){ $(b.dataset.now).value=player.currentTime.toFixed(1); rebuild(); }; });
+
+  // 탭 싱크
+  function tap(){
+    if(!tapMode) return;
+    if(player.paused && tapIdx===0 && player.currentTime<0.5){ player.currentTime=0; player.play(); return; }
+    if(player.paused){ player.play(); return; }
+    if(tapIdx>=timed.length) return;
+    var t=player.currentTime;
+    timed[tapIdx].start=t;
+    tapIdx++;
+    finishTap();
+  }
+  function finishTap(){
+    // 찍은 줄은 다음 찍힌 줄 직전까지, 아직 안 찍은 줄은 뒤로 밀어 배치
+    var lastStart=tapIdx?timed[tapIdx-1].start:0;
+    for(var i=tapIdx;i<timed.length;i++){ if(timed[i].start<=lastStart) timed[i].start=lastStart+0.5*(i-tapIdx+1); }
+    for(var k=0;k<timed.length;k++){
+      var nx=timed[k+1];
+      var natural=timed[k].start+Math.max(1.5,Math.min(8,timed[k].text.length*0.28));
+      timed[k].end=nx?Math.min(nx.start-0.02,natural):Math.min(song.duration||natural,natural);
+    }
+    basis=tapIdx>=timed.length?'탭으로 맞춤 (전체 완료)':('탭으로 맞춤 ('+tapIdx+'/'+timed.length+'줄, 나머지는 추정)');
+    render();
+    var nextEl=document.querySelector('.ln.next'); if(nextEl) nextEl.scrollIntoView({block:'center',behavior:'smooth'});
+  }
+  $("tapBtn").onclick=function(){ this.blur(); tap(); };
+  $('undoBtn').onclick=function(){ if(tapIdx>0){ tapIdx--; finishTap(); } };
+  $('resetTap').onclick=function(){ rebuild(); setTab('tap'); player.currentTime=0; player.pause(); };
+  document.addEventListener('keydown',function(e){
+    if(!tapMode || /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    if(e.code==='Space'){ e.preventDefault(); tap(); }
+    if(e.code==='Backspace'){ e.preventDefault(); $('undoBtn').click(); }
+  });
+
+  // 다운로드
+  function name(){ return C.safeName(song.title); }
+  $('dlSrt').onclick=function(){ C.save(C.toSRT(C.fixEnds(timed,song.duration)), name()+'.srt'); };
+  $('dlLrc').onclick=function(){ C.save(C.toLRC(timed,{title:song.title,artist:song.artist,duration:song.duration}), name()+'.lrc'); };
+  $('dlTxt').onclick=function(){ C.save(timed.map(function(l){return l.text;}).join('\n')+'\n', name()+'.txt'); };
+
+  // ?url= 로 바로 열기
+  var q=new URLSearchParams(location.search).get('url'); if(q){ $('url').value=q; $('f').requestSubmit(); }
+})();
+</script>
+</body>
+</html>
